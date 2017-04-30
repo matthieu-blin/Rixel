@@ -100,11 +100,11 @@ palette2Color :: Palette -> Word8 -> Color
 palette2Color palette index = if(i < (length palette)) then ( palette !! i) else (RGB 255 255 255)
   where i = fromIntegral index
 
-matrix2Pixel :: [Word8] -> Palette -> Int -> Int ->  [Pixel]
-matrix2Pixel [] p x y = []  
-matrix2Pixel (w:ws) p x y | x < nbPixelWidth-1 = (matrix2Pixel ws p (x+1) y) ++ [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
-                          | y < nbPixelHeight-1= (matrix2Pixel ws p 0 (y+1)) ++ [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
-                          | otherwise = [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
+matrix2Pixel :: [Word8] -> Palette -> Int ->  [Pixel]
+matrix2Pixel [] p i = []  
+matrix2Pixel (w:ws) p i | i >= nbPixelWidth * nbPixelHeight = []
+                        | w == 0  = matrix2Pixel ws p (i+1) 
+                        | otherwise = (matrix2Pixel ws p (i+1)) ++ [(palette2Color p w, index2point i)] 
 
 currentPalette :: [Color]
 currentPalette = [(RGB 0 0 0),(RGB 255 0 0), (RGB 0 255 0), (RGB 0 0 255), (RGB 255 255 0), (RGB 0 255 255), (RGB 255 0 255), (RGB 255 255 255)]
@@ -116,16 +116,18 @@ updateN :: [Word8] -> Int -> Word8 -> [Word8]
 updateN matrix n paletteIndex = before ++ (paletteIndex:after) where (before, (_:after)) = splitAt n matrix
             
 
-pos2Index :: (Int, Int) -> Int
-pos2Index (x,y) = y* nbPixelWidth + x
+index2point :: Int -> Point
+index2point i = (fromIntegral $ i `mod` nbPixelWidth, fromIntegral $  i `div` nbPixelHeight) 
 
-mouse2pos :: (Int ,Int) -> (Int, Int)
-mouse2pos (x,y) = (x * nbPixelWidth `quot` canWidth,y * nbPixelHeight `quot` canHeight) 
+mouse2Index :: (Int ,Int) -> Int
+mouse2Index (x,y) = yp * nbPixelWidth + xp
+  where xp = x * nbPixelWidth `quot` canWidth
+        yp = y * nbPixelHeight `quot` canHeight 
 
 renderMatrix :: Canvas -> IORef GameState -> IO ()
 renderMatrix canv state = do
   gamestate  <- readIORef state
-  render canv $ renderPixel $ matrix2Pixel (matrix gamestate) (palette gamestate) 0 0
+  render canv $ renderPixel $ matrix2Pixel (matrix gamestate) (palette gamestate) 0
   setTimer (Once 67) $ renderMatrix canv state
   return ()
   
@@ -153,10 +155,9 @@ main = do
 
     -- Set an event handler for clicks in the canvas
     canvas `onEvent` Click $ \mouse -> do
-        let pos = mouse2pos $  mouseCoords mouse
-            index = pos2Index pos
-        gamestate <- trace(show pos) trace(show index) readIORef state
-        let newmatrix =  updateN (matrix gamestate) index 8
+        let index = mouse2Index $  mouseCoords mouse
+        gamestate <- readIORef state
+        let newmatrix =  updateN (matrix gamestate) index 4
             newpalette = palette gamestate
         writeIORef state $ GameState newmatrix newpalette
 
