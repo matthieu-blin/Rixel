@@ -102,18 +102,22 @@ palette2Color palette index = if(i < (length palette)) then ( palette !! i) else
 
 matrix2Pixel :: [Word8] -> Palette -> Int -> Int ->  [Pixel]
 matrix2Pixel [] p x y = []  
-matrix2Pixel (w:ws) p x y | x < nbPixelWidth = (matrix2Pixel ws p (x+1) y) ++ [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
-                          | y < nbPixelHeight = (matrix2Pixel ws p 0 (y+1)) ++ [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
+matrix2Pixel (w:ws) p x y | x < nbPixelWidth-1 = (matrix2Pixel ws p (x+1) y) ++ [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
+                          | y < nbPixelHeight-1= (matrix2Pixel ws p 0 (y+1)) ++ [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
                           | otherwise = [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
 
 currentPalette :: [Color]
 currentPalette = [(RGB 0 0 0),(RGB 255 0 0), (RGB 0 255 0), (RGB 0 0 255), (RGB 255 255 0), (RGB 0 255 255), (RGB 255 0 255), (RGB 255 255 255)]
 
 currentMatrix :: [Word8]
-currentMatrix  =  [0,1,2,3,4,5,6,7,8]
+currentMatrix  =  replicate (nbPixelWidth * nbPixelHeight) 0
+
+updateN :: [Word8] -> Int -> Word8 -> [Word8]
+updateN matrix n paletteIndex = before ++ (paletteIndex:after) where (before, (_:after)) = splitAt n matrix
+            
 
 pos2Index :: (Int, Int) -> Int
-pos2Index (x,y) = y * nbPixelWidth + x
+pos2Index (x,y) = y* nbPixelWidth + x
 
 mouse2pos :: (Int ,Int) -> (Int, Int)
 mouse2pos (x,y) = (x * nbPixelWidth `quot` canWidth,y * nbPixelHeight `quot` canHeight) 
@@ -122,7 +126,7 @@ renderMatrix :: Canvas -> IORef GameState -> IO ()
 renderMatrix canv state = do
   gamestate  <- readIORef state
   render canv $ renderPixel $ matrix2Pixel (matrix gamestate) (palette gamestate) 0 0
-  setTimer (Once 20) $ renderMatrix canv state
+  setTimer (Once 67) $ renderMatrix canv state
   return ()
   
 data GameState = GameState { matrix :: PixelMatrix
@@ -152,7 +156,9 @@ main = do
         let pos = mouse2pos $  mouseCoords mouse
             index = pos2Index pos
         gamestate <- trace(show pos) trace(show index) readIORef state
-        writeIORef state gamestate
+        let newmatrix =  updateN (matrix gamestate) index 8
+            newpalette = palette gamestate
+        writeIORef state $ GameState newmatrix newpalette
 
     changepalette `onEvent` Click $ \_ -> do
       gamestate <- readIORef state
@@ -160,7 +166,7 @@ main = do
       writeIORef state (GameState currentMatrix npalette)
 
     -- Set an event handler for the clear button
---    clear `onEvent` Click $ \_ -> writeIORef state [3,5,7,8,9]
+    clear `onEvent` Click $ \_ -> writeIORef state $ GameState currentMatrix currentPalette 
 
 -- Note: The current version of Haste does not run the event handler
 -- concurrently with the animation, so there's no risk of a race between the
