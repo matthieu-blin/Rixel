@@ -69,12 +69,12 @@ animate can state = do
     return ()
 
 canWidth, canHeight :: Num a => a
-canWidth  = 720
-canHeight = 576
+canWidth  = 512
+canHeight = 512
 
 nbPixelWidth, nbPixelHeight :: Num a => a
-nbPixelWidth = 256
-nbPixelHeight = 224
+nbPixelWidth = 32
+nbPixelHeight = 32
 
 pixelWidth = canWidth / nbPixelWidth
 pixelHeight = canHeight / nbPixelHeight
@@ -101,7 +101,7 @@ palette2Color palette index = if(i < (length palette)) then ( palette !! i) else
   where i = fromIntegral index
 
 matrix2Pixel :: [Word8] -> Palette -> Int -> Int ->  [Pixel]
-matrix2Pixel [] p x y = trace(show x) trace(show y) []  
+matrix2Pixel [] p x y = []  
 matrix2Pixel (w:ws) p x y | x < nbPixelWidth = (matrix2Pixel ws p (x+1) y) ++ [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
                           | y < nbPixelHeight = (matrix2Pixel ws p 0 (y+1)) ++ [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
                           | otherwise = [(palette2Color p w, (fromIntegral x, fromIntegral y))] 
@@ -111,6 +111,12 @@ currentPalette = [(RGB 0 0 0),(RGB 255 0 0), (RGB 0 255 0), (RGB 0 0 255), (RGB 
 
 currentMatrix :: [Word8]
 currentMatrix  =  [0,1,2,3,4,5,6,7,8]
+
+pos2Index :: (Int, Int) -> Int
+pos2Index (x,y) = y * nbPixelWidth + x
+
+mouse2pos :: (Int ,Int) -> (Int, Int)
+mouse2pos (x,y) = (x * nbPixelWidth `quot` canWidth,y * nbPixelHeight `quot` canHeight) 
 
 renderMatrix :: Canvas -> IORef GameState -> IO ()
 renderMatrix canv state = do
@@ -128,6 +134,7 @@ main = do
     clear  <- mkButton "clear"
     changepalette  <- mkButton "change palette"
     column documentBody [canvas,clear, changepalette]
+    row documentBody [clear, changepalette]
 
     setStyle documentBody "backgroundColor" "lightblue"
     setStyle documentBody "textAlign" "center"
@@ -141,12 +148,11 @@ main = do
     renderMatrix can state
 
     -- Set an event handler for clicks in the canvas
-    --canvas `onEvent` Click $ \mouse -> do
-    --  let (x,y) = mouseCoords mouse
-    --      pos   = (fromIntegral x, fromIntegral y)
-    --      ball  = bounce (canWidth,canHeight) pos 0
-    --  balls <- readIORef state
-    --  writeIORef state (ball:balls)
+    canvas `onEvent` Click $ \mouse -> do
+        let pos = mouse2pos $  mouseCoords mouse
+            index = pos2Index pos
+        gamestate <- trace(show pos) trace(show index) readIORef state
+        writeIORef state gamestate
 
     changepalette `onEvent` Click $ \_ -> do
       gamestate <- readIORef state
