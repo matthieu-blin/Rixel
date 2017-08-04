@@ -106,6 +106,10 @@ matrix2Pixel (w:ws) p i | i >= nbPixelWidth * nbPixelHeight = []
                         | w == 0  = matrix2Pixel ws p (i+1) 
                         | otherwise = (matrix2Pixel ws p (i+1)) ++ [(palette2Color p w, index2point i)] 
 
+palette2pixel :: [Color] -> Int -> [Pixel]
+palette2pixel [] i = []
+palette2pixel (w:ws) i = (palette2pixel ws (i+1)) ++ [(w, index2point i)]
+
 currentPalette :: [Color]
 currentPalette = [(RGB 0 0 0),(RGB 255 0 0), (RGB 0 255 0), (RGB 0 0 255), (RGB 255 255 0), (RGB 0 255 255), (RGB 255 0 255), (RGB 255 255 255)]
 
@@ -130,41 +134,56 @@ renderMatrix canv state = do
   render canv $ renderPixel $ matrix2Pixel (matrix gamestate) (palette gamestate) 0
   setTimer (Once 67) $ renderMatrix canv state
   return ()
+
+renderPalette :: Canvas -> IORef GameState -> IO ()
+renderPalette canv state = do
+  gamestate  <- readIORef state
+  render canv $ renderPixel $ palette2pixel (palette gamestate) 0
+  setTimer (Once 67) $ renderPalette canv state
+  return ()
   
 data GameState = GameState { matrix :: PixelMatrix
                             , palette :: Palette
+                            , paletteIndex :: Word8
 }
 
 main = do
     canvas <- mkCanvas canWidth canHeight
+    canPalette <- mkCanvas canWidth (round pixelHeight)
     clear  <- mkButton "clear"
     changepalette  <- mkButton "change palette"
-    column documentBody [canvas,clear, changepalette]
+    column documentBody [canvas,canPalette, clear, changepalette]
     row documentBody [clear, changepalette]
 
     setStyle documentBody "backgroundColor" "lightblue"
     setStyle documentBody "textAlign" "center"
 
     Just can <- getCanvas canvas
+    Just canp <- getCanvas canPalette
 
     -- Use an IORef to communicate between the animation and the event handlers
     state <- newIORef $ GameState currentMatrix currentPalette
 
     -- Start the animation
     renderMatrix can state
+    renderPalette canp state
+
 
     -- Set an event handler for clicks in the canvas
     canvas `onEvent` Click $ \mouse -> do
         let index = mouse2Index $  mouseCoords mouse
         gamestate <- readIORef state
-        let newmatrix =  updateN (matrix gamestate) index 4
-            newpalette = palette gamestate
-        writeIORef state $ GameState newmatrix newpalette
+        let currentPaletteIndex = (paletteIndex gamestate)
+            newmatrix =  updateN (matrix gamestate) index currentPaletteIndex
+            currentPalette = palette gamestate
+        writeIORef state $ GameState newmatrix currentPalette currentPaletteIndex
 
     changepalette `onEvent` Click $ \_ -> do
-      gamestate <- readIORef state
-      let npalette = [(RGB 128 128 128), (RGB 27 32 244), (RGB 188 23 182), (RGB 232 231 12)] 
-      writeIORef state (GameState currentMatrix npalette)
+        gamestate2 <- readIORef state
+        let currentPaletteIndex = (paletteIndex gamestate2)
+            currentMatrix =  (matrix gamestate2)
+            npalette = [(RGB 128 128 128), (RGB 27 32 244), (RGB 188 23 182), (RGB 232 231 12)] 
+        writeIORef state $ GameState currentMatrix npalette currentPaletteIndex
 
     -- Set an event handler for the clear button
     clear `onEvent` Click $ \_ -> writeIORef state $ GameState currentMatrix currentPalette 
