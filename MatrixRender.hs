@@ -6,7 +6,6 @@ import Haste.Events
 import Data.IORef
 import Data.Word
 import Debug.Trace
-import qualified Data.Vector.Unboxed as V
 
 import Pages
 import Control.Exception
@@ -80,16 +79,16 @@ pixelWidth = canWidth / nbPixelWidth
 pixelHeight = canHeight / nbPixelHeight
 
 type Palette = [Color]
-type Pixel = (Color, Point) 
+type Pixel = (Color, Point)
 type Pixels = [Pixel]
-type PixelMatrix = [Word8] 
+type PixelMatrix = [Word8]
 
 renderOnePixel :: Pixel -> Picture ()
-renderOnePixel p = 
+renderOnePixel p =
   color (pixelcolor) $ fill $ rect (x,y) (x+pixelWidth, y+pixelHeight)
   where pixelpoint = snd p
-        x = (fst pixelpoint) * pixelWidth 
-        y = (snd pixelpoint) * pixelHeight 
+        x = (fst pixelpoint) * pixelWidth
+        y = (snd pixelpoint) * pixelHeight
         pixelcolor = fst p
 
 renderPixel :: Pixels -> Picture ()
@@ -101,10 +100,10 @@ palette2Color palette index = if(i < (length palette)) then ( palette !! i) else
   where i = fromIntegral index
 
 matrix2Pixel :: [Word8] -> Palette -> Int ->  [Pixel]
-matrix2Pixel [] p i = []  
+matrix2Pixel [] p i = []
 matrix2Pixel (w:ws) p i | i >= nbPixelWidth * nbPixelHeight = []
-                        | w == 0  = matrix2Pixel ws p (i+1) 
-                        | otherwise = (matrix2Pixel ws p (i+1)) ++ [(palette2Color p w, index2point i)] 
+                        | w == 0  = matrix2Pixel ws p (i+1)
+                        | otherwise = (matrix2Pixel ws p (i+1)) ++ [(palette2Color p w, index2point i)]
 
 palette2pixel :: [Color] -> Int -> [Pixel]
 palette2pixel [] i = []
@@ -118,15 +117,15 @@ currentMatrix  =  replicate (nbPixelWidth * nbPixelHeight) 0
 
 updateN :: [Word8] -> Int -> Word8 -> [Word8]
 updateN matrix n paletteIndex = before ++ (paletteIndex:after) where (before, (_:after)) = splitAt n matrix
-            
+
 
 index2point :: Int -> Point
-index2point i = (fromIntegral $ i `mod` nbPixelWidth, fromIntegral $  i `div` nbPixelHeight) 
+index2point i = (fromIntegral $ i `mod` nbPixelWidth, fromIntegral $  i `div` nbPixelHeight)
 
 mouse2Index :: (Int ,Int) -> Int
 mouse2Index (x,y) = yp * nbPixelWidth + xp
   where xp = x * nbPixelWidth `quot` canWidth
-        yp = y * nbPixelHeight `quot` canHeight 
+        yp = y * nbPixelHeight `quot` canHeight
 
 renderMatrix :: Canvas -> IORef GameState -> IO ()
 renderMatrix canv state = do
@@ -141,7 +140,7 @@ renderPalette canv state = do
   render canv $ renderPixel $ palette2pixel (palette gamestate) 0
   setTimer (Once 67) $ renderPalette canv state
   return ()
-  
+
 data GameState = GameState { matrix :: PixelMatrix
                             , palette :: Palette
                             , paletteIndex :: Word8
@@ -162,7 +161,7 @@ main = do
     Just canp <- getCanvas canPalette
 
     -- Use an IORef to communicate between the animation and the event handlers
-    state <- newIORef $ GameState currentMatrix currentPalette
+    state <- newIORef $ GameState currentMatrix currentPalette 1
 
     -- Start the animation
     renderMatrix can state
@@ -182,14 +181,13 @@ main = do
         gamestate2 <- readIORef state
         let currentPaletteIndex = (paletteIndex gamestate2)
             currentMatrix =  (matrix gamestate2)
-            npalette = [(RGB 128 128 128), (RGB 27 32 244), (RGB 188 23 182), (RGB 232 231 12)] 
+            npalette = [(RGB 128 128 128), (RGB 27 32 244), (RGB 188 23 182), (RGB 232 231 12)]
         writeIORef state $ GameState currentMatrix npalette currentPaletteIndex
 
     -- Set an event handler for the clear button
-    clear `onEvent` Click $ \_ -> writeIORef state $ GameState currentMatrix currentPalette 
+    clear `onEvent` Click $ \_ -> writeIORef state $ GameState currentMatrix currentPalette 1
 
 -- Note: The current version of Haste does not run the event handler
 -- concurrently with the animation, so there's no risk of a race between the
 -- different uses of `writeIORef`. If it was truly concurrent, then atomic
 -- operations would have to be used instead (see the Data.IORef documentation).
-
